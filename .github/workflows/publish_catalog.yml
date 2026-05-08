@@ -1,0 +1,72 @@
+name: Publish catalog tracks.json
+
+on:
+  workflow_dispatch:
+    inputs:
+      max_tracks:
+        description: "Optional --max value (empty means unlimited)"
+        required: false
+        type: string
+        default: ""
+      check_urls:
+        description: "Enable --check-urls"
+        required: false
+        type: boolean
+        default: true
+  schedule:
+    - cron: "0 6 * * *" # daily 06:00 UTC
+
+permissions:
+  contents: write
+
+concurrency:
+  group: catalog-publish-${{ github.repository }}
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    if: ${{ github.ref == 'refs/heads/main' || github.event_name == 'schedule' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dart-lang/setup-dart@v1
+
+      - run: dart pub get
+
+      - name: Generate tracks.json
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          mkdir -p catalog-dist
+          cmd=(dart run tools/fetch_loc_catalog.dart \
+            --no-item-api \
+            --output=catalog-dist/tracks.json)
+
+          if [ "$EVENT_NAME" = "schedule" ]; then
+            cmd+=(--check-urls --url-check-timeout-ms=1200 --max=1500)
+          else
+            if [ "${{ inputs.check_urls }}" = "true" ]; then
+              cmd+=(--check-urls --url-check-timeout-ms=1200)
+            fi
+            max="${{ inputs.max_tracks }}"
+            if [ -n "$max" ]; then
+              cmd+=(--max="$max")
+            fi
+          fi
+
+          "${cmd[@]}"
+
+      - name: Validate catalog
+        run: dart run tools/validate_catalog.dart catalog-dist/tracks.json
+
+      - name: Deploy to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: catalog-dist
+          force_orphan: true
