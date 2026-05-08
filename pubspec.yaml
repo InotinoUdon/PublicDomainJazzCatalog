@@ -1,0 +1,5 @@
+name: public_domain_jazz_catalog
+description: Catalog generator for PublicDomainJazzPlayer
+publish_to: "none"
+environment:
+  sdk: ">=3.3.0 <4.0.0"
