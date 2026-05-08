@@ -63,6 +63,12 @@ jobs:
       - name: Validate catalog
         run: dart run tools/validate_catalog.dart catalog-dist/tracks.json
 
+      - name: Add legal docs to publish dir
+        run: |
+          mkdir -p catalog-dist
+          cp docs/terms_of_use.md catalog-dist/terms_of_use.md
+          cp docs/privacy_policy.md catalog-dist/privacy_policy.md
+
       - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v4
         with:
